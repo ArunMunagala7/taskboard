@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+env/
+venv/
+
+# Virtualenv
+pip-wheel-metadata/
+
+# VSCode
+.vscode/
+
+# Alembic migrations cache
+alembic/versions/*.pyc
+
+# Docker
+*.log
+*.pid
+*.seed
+*.sock
+*.swp
+*.tmp
+*.bak
+*.old
+
+# Byte-compiled/misc
+.DS_Store
