@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.deps import get_current_user
 from app.core.cache import cache_get, cache_set, cache_delete_pattern
+from app.core.ratelimit import rl_task_list
 from app.models.task import Task, Status
 from app.models.user import User
 from app.schemas.task import TaskCreate, TaskOut
@@ -49,7 +50,6 @@ def create_task(
         description=payload.description,
         status=payload.status or Status.todo,
         priority=payload.priority or 0,
-        # due_at can be wired in later if you expose it in TaskCreate
     )
     db.add(task)
     db.commit()
@@ -66,6 +66,7 @@ def list_tasks(
     project_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _rl: None = Depends(lambda: rl_task_list(current_user.id)),  # ⛔ 120/5min per user
 
     status: Status | None = Query(None),
     assignee_id: int | None = Query(None),
@@ -75,7 +76,6 @@ def list_tasks(
     due_before: datetime | None = Query(None),
     q: str | None = Query(None),
 
-    # NEW default: latest first
     order_by: Literal["created_at", "due_at", "priority", "id"] = "created_at",
     order: Literal["asc", "desc"] = "desc",
     page: int = Query(1, ge=1),
