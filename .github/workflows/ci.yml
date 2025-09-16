@@ -1,10 +1,15 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
   test:
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:16-alpine
@@ -12,19 +17,26 @@ jobs:
           POSTGRES_USER: taskuser
           POSTGRES_PASSWORD: taskpass
           POSTGRES_DB: taskdb
-        ports: ["5432:5432"]
+        ports:
+          - 5432:5432
         options: >-
           --health-cmd="pg_isready -U taskuser -d taskdb"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
+
       redis:
         image: redis:7-alpine
-        ports: ["6379:6379"]
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -35,18 +47,23 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest
 
-      - name: Alembic upgrade
+      - name: Run migrations
+        run: |
+          alembic upgrade head
         env:
           POSTGRES_USER: taskuser
           POSTGRES_PASSWORD: taskpass
           POSTGRES_DB: taskdb
           POSTGRES_HOST: localhost
-          POSTGRES_PORT: 5432
-        run: alembic upgrade head
+          REDIS_URL: redis://localhost:6379/0
 
       - name: Run tests
         run: |
-          export PYTHONPATH="${PYTHONPATH}:$(pwd)"
-          pytest -q
+          pytest -v
+        env:
+          POSTGRES_USER: taskuser
+          POSTGRES_PASSWORD: taskpass
+          POSTGRES_DB: taskdb
+          POSTGRES_HOST: localhost
+          REDIS_URL: redis://localhost:6379/0
