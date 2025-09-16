@@ -13,6 +13,7 @@ from app.schemas.task import TaskCreate, TaskOut
 
 router = APIRouter()
 
+
 def _key_for_list(
     project_id: int,
     status, assignee_id, priority_min, priority_max, due_after, due_before, q,
@@ -34,6 +35,7 @@ def _key_for_list(
     ]
     return "tasks:" + "|".join(parts)
 
+
 @router.post("/projects/{project_id}/tasks", response_model=TaskOut)
 def create_task(
     project_id: int,
@@ -47,6 +49,7 @@ def create_task(
         description=payload.description,
         status=payload.status or Status.todo,
         priority=payload.priority or 0,
+        # due_at can be wired in later if you expose it in TaskCreate
     )
     db.add(task)
     db.commit()
@@ -56,6 +59,7 @@ def create_task(
     cache_delete_pattern(f"tasks:p:{project_id}*")
 
     return task
+
 
 @router.get("/projects/{project_id}/tasks")
 def list_tasks(
@@ -71,8 +75,9 @@ def list_tasks(
     due_before: datetime | None = Query(None),
     q: str | None = Query(None),
 
-    order_by: Literal["due_at", "priority", "id"] = "id",
-    order: Literal["asc", "desc"] = "asc",
+    # NEW default: latest first
+    order_by: Literal["created_at", "due_at", "priority", "id"] = "created_at",
+    order: Literal["asc", "desc"] = "desc",
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
 ):
@@ -100,7 +105,12 @@ def list_tasks(
         query = query.filter(Task.title.ilike(f"%{q}%"))
 
     total = query.count()
-    col = {"due_at": Task.due_at, "priority": Task.priority, "id": Task.id}[order_by]
+    col = {
+        "created_at": Task.created_at,
+        "due_at": Task.due_at,
+        "priority": Task.priority,
+        "id": Task.id,
+    }[order_by]
     query = query.order_by(col.asc() if order == "asc" else col.desc())
 
     offset = (page - 1) * limit
